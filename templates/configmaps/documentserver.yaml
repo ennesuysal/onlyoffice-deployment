@@ -1,0 +1,43 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: documentserver
+  namespace: {{ include "ds.namespace" . | quote }}
+  {{- if .Values.commonLabels }}
+  labels:
+    {{- include "ds.labels.commonLabels" . | trim | nindent 4 }}
+  {{- end }}
+data:
+  DB_TYPE: {{ template "ds.db.type" . }}
+  DB_USER: {{ .Values.connections.dbUser }}
+  DB_HOST: {{ .Values.connections.dbHost }}
+  DB_PORT: {{ .Values.connections.dbPort | quote }}
+  DB_NAME: {{ .Values.connections.dbName }}
+  REDIS_SERVER_HOST: {{ .Values.connections.redisHost }}
+  REDIS_SERVER_PORT: {{ .Values.connections.redisPort | quote }}
+  REDIS_SERVER_USER: {{ .Values.connections.redisUser }}
+  REDIS_SERVER_DB_NUM: {{ .Values.connections.redisDBNum | quote }}
+  AMQP_TYPE: {{ .Values.connections.amqpType }}
+  AMQP_PORT: {{ .Values.connections.amqpPort | quote }}
+  AMQP_VHOST: {{ .Values.connections.amqpVhost | quote }}
+  AMQP_HOST: {{ .Values.connections.amqpHost }}
+  AMQP_USER: {{ .Values.connections.amqpUser }}
+  AMQP_PROTO: {{ .Values.connections.amqpProto }}
+  METRICS_ENABLED: {{ .Values.metrics.enabled | quote }}
+  METRICS_HOST: {{ .Values.metrics.host }}
+  METRICS_PORT: {{ .Values.metrics.port | quote }}
+  METRICS_PREFIX: {{ .Values.metrics.prefix }}
+  LOG_LEVEL: {{ .Values.log.level }}
+  LOG_TYPE: {{ .Values.log.type }}
+  LOG_PATTERN: {{ .Values.log.pattern | quote }}
+  NGINX_GZIP_PROXIED: {{ .Values.proxy.gzipProxied | quote }}
+  SECURE_LINK_SECRET: {{ .Values.proxy.secureLinkSecret | quote }}
+  {{- if .Values.example.enabled }}
+  EXAMPLE_HOST_PORT: example:3000
+  {{- end }}
+  WOPI_ENABLED: {{ .Values.wopi.enabled | quote }}
+  {{- if .Values.webProxy.enabled }}
+  http_proxy: {{ .Values.webProxy.http | quote }}
+  https_proxy: {{ .Values.webProxy.https | quote }}
+  no_proxy: {{ .Values.webProxy.noProxy | quote }}
+  {{- end }}

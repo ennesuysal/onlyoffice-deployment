@@ -1,0 +1,73 @@
+{{- if .Values.example.enabled }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: example
+  namespace: {{ include "ds.namespace" . | quote }}
+  labels:
+    app: example
+    {{- if .Values.commonLabels }}
+    {{- include "ds.labels.commonLabels" . | trim | nindent 4 }}
+    {{- end }}
+spec:
+  selector:
+    matchLabels:
+      app: example
+      {{- if .Values.commonLabels }}
+      {{- include "ds.labels.commonLabels" . | trim | nindent 6 }}
+      {{- end }}
+  serviceName: example
+  replicas: 1
+  {{- if .Values.example.updateStrategy }}
+  updateStrategy: {{- toYaml .Values.example.updateStrategy | nindent 4 }}
+  {{- end }}
+  podManagementPolicy: OrderedReady
+  template:
+    metadata:
+      labels:
+        app: example
+        {{- if .Values.commonLabels }}
+        {{- include "ds.labels.commonLabels" . | trim | nindent 8 }}
+        {{- end }}
+      {{- if .Values.example.podAnnotations }}
+      annotations:
+        {{- range $key, $value := .Values.example.podAnnotations }}
+        {{ $key }}: {{ tpl $value $ }}
+        {{- end }}
+      {{- end }}
+    spec:
+      serviceAccountName: {{ include "ds.serviceAccountName" . }}
+      {{- if .Values.podSecurityContext.enabled }}
+      securityContext: {{- toYaml .Values.podSecurityContext.example | nindent 8 }}
+      {{- end }}
+      {{- if or .Values.example.podAffinity .Values.example.nodeAffinity }}
+      affinity:
+        {{- with .Values.example.podAffinity }}
+        podAffinity:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        {{- with .Values.example.nodeAffinity }}
+        nodeAffinity:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+      {{- end }}
+      {{- if .Values.nodeSelector }}
+      nodeSelector: {{ toYaml .Values.nodeSelector | nindent 8 }}
+      {{- end }}
+      {{- if .Values.tolerations }}
+      tolerations: {{ toYaml .Values.tolerations | nindent 8 }}
+      {{- end }}
+      containers:
+      - name: example
+        image: {{ .Values.example.image.repository }}:{{ .Values.example.image.tag }}
+        imagePullPolicy: {{ .Values.example.image.pullPolicy }}
+        ports:
+        - containerPort: {{ .Values.example.containerPorts.http }}
+          name: http
+        resources: {{ toYaml .Values.example.resources | nindent 10 }}
+        envFrom:
+        - secretRef:
+            name: {{ template "ds.jwt.secretName" . }}
+        - configMapRef:
+            name: example
+{{- end }}

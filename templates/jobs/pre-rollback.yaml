@@ -1,0 +1,79 @@
+{{- if .Values.rollback.job.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: pre-rollback
+  namespace: {{ include "ds.namespace" . | quote }}
+  {{- if .Values.commonLabels }}
+  labels:
+    {{- include "ds.labels.commonLabels" . | trim | nindent 4 }}
+  {{- end }}
+  annotations:
+    "helm.sh/hook": pre-rollback
+    "helm.sh/hook-weight": "3"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded,hook-failed
+spec:
+  backoffLimit: 2
+  template:
+    spec:
+      serviceAccountName: {{ include "ds.serviceAccountName" . }}
+      {{- if .Values.nodeSelector }}
+      nodeSelector: {{ toYaml .Values.nodeSelector | nindent 8 }}
+      {{- end }}
+      {{- if .Values.tolerations }}
+      tolerations: {{ toYaml .Values.tolerations | nindent 8 }}
+      {{- end }}
+      {{- if .Values.podSecurityContext.enabled }}
+      securityContext: {{- toYaml .Values.podSecurityContext.jobs | nindent 8 }}
+      {{- end }}
+      volumes:
+        - name: ds-files
+          persistentVolumeClaim:
+            claimName: {{ template "ds.pvc.name" . }}
+        - name: stop-scripts
+          configMap:
+            name: {{ template "ds.rollback.configMapName" . }}
+            defaultMode: 0755
+        {{- if and .Values.privateCluster (not .Values.rollback.existingConfigmap.dsStop) }}
+        - name: remove-dt-scripts
+          configMap:
+            name: {{ template "ds.rollback.configmap.tblRemove.name" . }}
+        - name: create-dt-scripts
+          configMap:
+            name: {{ template "ds.rollback.configmap.tblCreate.name" . }}
+        {{- end }}
+      containers:
+        - name: pre-rollback
+          image: {{ .Values.rollback.job.image.repository }}:{{ .Values.rollback.job.image.tag }}
+          imagePullPolicy: {{ .Values.rollback.job.image.pullPolicy }}
+          resources: {{- toYaml .Values.rollback.job.resources | nindent 12 }}
+          env:
+          - name: DB_PWD
+            valueFrom:
+              secretKeyRef:
+                name: {{ template "ds.db.secretName" . }}
+                key: {{ .Values.connections.dbSecretKeyName }}
+          - name: PRIVATE_CLUSTER
+            value: {{ .Values.privateCluster | quote }}
+          volumeMounts:
+          - name: ds-files
+            mountPath: /var/lib/{{ .Values.product.name }}/documentserver/App_Data/cache/files
+          - name: stop-scripts
+            mountPath: /sql/stop.sh
+            subPath: stop.sh
+          {{- if and .Values.privateCluster (not .Values.rollback.existingConfigmap.dsStop) }}
+          - name: remove-dt-scripts
+            mountPath: /sql/{{ .Values.rollback.existingConfigmap.tblRemove.keyName }}
+            subPath: {{ .Values.rollback.existingConfigmap.tblRemove.keyName }}
+          - name: create-dt-scripts
+            mountPath: /sql/{{ .Values.rollback.existingConfigmap.tblCreate.keyName }}
+            subPath: {{ .Values.rollback.existingConfigmap.tblCreate.keyName }}
+          {{- end }}
+          command: ["/bin/sh", "-c"]
+          {{- if .Values.webProxy.enabled }}
+          args: ["http_proxy={{ .Values.webProxy.http }} https_proxy={{ .Values.webProxy.https }} no_proxy={{ .Values.webProxy.noProxy }} /sql/stop.sh"]
+          {{- else }}
+          args: ["/sql/stop.sh"]
+          {{- end }}
+      restartPolicy: Never
+{{- end }}
